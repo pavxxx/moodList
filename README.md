@@ -1,4 +1,4 @@
-## Personalized Spotify Playlist Generator
+## MoodList
 
 A simple Python app using Streamlit and Spotipy that generates a custom Spotify playlist based on your musical preferences. Adjust energy, danceability, and happiness (valence) to create a playlist tailored to you!
 
