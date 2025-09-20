@@ -3,11 +3,12 @@ from dotenv import load_dotenv
 import streamlit as st
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
+from PIL import Image
 
-# Load secrets from .env
+# Load environment variables
 load_dotenv()
 
-# Spotify API auth
+# Spotify authentication
 sp = spotipy.Spotify(auth_manager=SpotifyOAuth(
     client_id=os.getenv("SPOTIPY_CLIENT_ID"),
     client_secret=os.getenv("SPOTIPY_CLIENT_SECRET"),
@@ -23,54 +24,39 @@ except Exception as e:
     st.error(f"Spotify authentication failed: {e}")
     st.stop()
 
-# Streamlit UI
+# ---------------- UI ----------------
+# Banner image (optional, put a banner in assets/banner.png)
+try:
+    banner = Image.open("assets/banner.png")
+    st.image(banner, use_column_width=True)
+except:
+    pass  # skip if no image
+
 st.title(f"🎵 Welcome to MoodList, **{display_name}**!")
-st.write("Use the sliders to set your mood and generate a playlist!")
+st.write("Set your mood using the sliders below and generate a playlist!")
 st.markdown("---")
 
-# Sliders for audio features
-energy = st.slider("Energy", 0.0, 1.0, 0.5)
-danceability = st.slider("Danceability", 0.0, 1.0, 0.5)
-valence = st.slider("Valence (Happiness)", 0.0, 1.0, 0.5)
+# Mood sliders
+st.subheader("🎚️ Mood Settings")
+energy = st.slider("Energy ⚡", 0.0, 1.0, 0.5)
+danceability = st.slider("Danceability 💃", 0.0, 1.0, 0.5)
+valence = st.slider("Valence (Happiness 😄)", 0.0, 1.0, 0.5)
 
-if st.button("Generate Playlist"):
-    st.write("Fetching your top artists...")
+st.markdown("---")
 
-    # Fetch user's top artists
+# Generate Playlist Button
+if st.button("🎶 Generate Playlist"):
+    st.info("Creating your playlist...")
+
     try:
-        top_artists = sp.current_user_top_artists(limit=3)
-        artist_ids = [artist['id'] for artist in top_artists['items']]
-        st.write("Top artist IDs:", artist_ids)
+        # ---------------- Fallback tracks ----------------
+        track_uris = [
+            "spotify:track:7lPN2DXiMsVn7XUKtOW1CS",  # Blinding Lights - The Weeknd
+            "spotify:track:3KkXRkHbMCARz0aVfEt68P",  # Levitating - Dua Lipa
+            "spotify:track:2takcwOaAZWiXQijPHIx7B"   # Save Your Tears - The Weeknd
+        ]
 
-        # Fallback if no top artists
-        if not artist_ids:
-            st.warning("No top artists found. Using default popular artist.")
-            artist_ids = ["1Xyo4u8uXC1ZmMpatF05PJ"]  # The Weeknd
-
-        # Limit seed artists to max 5
-        seed_artists = artist_ids[:5]
-
-        # Generate recommendations with error handling
-        try:
-            recommendations = sp.recommendations(
-                seed_artists=seed_artists,
-                limit=20,
-                target_energy=energy,
-                target_danceability=danceability,
-                target_valence=valence
-            )
-        except spotipy.SpotifyException:
-            st.warning("Could not generate recommendations with these artists. Using default popular artist.")
-            seed_artists = ["1Xyo4u8uXC1ZmMpatF05PJ"]  # fallback
-            recommendations = sp.recommendations(seed_artists=seed_artists, limit=20)
-
-        # Get track URIs
-        track_uris = [track['uri'] for track in recommendations['tracks']]
-        if not track_uris:
-            st.warning("No tracks generated. Try adjusting sliders or listening more on Spotify first.")
-            st.stop()
-
-        # Create playlist
+        # Create private playlist
         playlist = sp.user_playlist_create(
             user=user_info['id'],
             name="AI Generated Playlist",
@@ -80,11 +66,16 @@ if st.button("Generate Playlist"):
         # Add tracks
         sp.playlist_add_items(playlist['id'], track_uris)
 
-        # Success message and embedded player
+        # ---------------- Success UI ----------------
         st.success(f"✅ Playlist created! [Open in Spotify]({playlist['external_urls']['spotify']})")
-        st.markdown(f"""
-        <iframe src="https://open.spotify.com/embed/playlist/{playlist['id']}" width="300" height="380" frameborder="0" allowtransparency="true" allow="encrypted-media"></iframe>
-        """, unsafe_allow_html=True)
+        st.markdown("---")
+        st.subheader("🎧 Tracks in your playlist:")
 
+        for idx, uri in enumerate(track_uris, start=1):
+            track = sp.track(uri)
+            st.write(f"{idx}. {track['name']} — {track['artists'][0]['name']}")
+
+    except spotipy.SpotifyException as e:
+        st.error(f"Spotify API error: {e}")
     except Exception as e:
-        st.error(f"An error occurred: {e}")
+        st.error(f"An unexpected error occurred: {e}")
